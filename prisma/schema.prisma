@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum RolUsuario {
+  ADMIN
+  GERENTE
+  CAJERO
+}
+
+enum EstadoVenta {
+  COMPLETADA
+  CANCELADA
+  REEMBOLSADA
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+  MIXTO
+}
+
+enum TipoMovimientoInventario {
+  VENTA
+  COMPRA
+  AJUSTE
+  DEVOLUCION
+  INICIAL
+}
+
+enum EstadoSesionCaja {
+  ABIERTA
+  CERRADA
+}
+
+enum TipoMovimientoCaja {
+  VENTA
+  INGRESO
+  GASTO
+  RETIRO
+  REEMBOLSO
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Usuario {
+  id            String     @id @default(uuid())
+  nombre        String
+  correo        String     @unique
+  password      String
+  rol           RolUsuario @default(CAJERO)
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+
+  ventas                Venta[]
+  movimientosInventario MovimientoInventario[]
+  sesionesAbiertas      SesionCaja[]           @relation("SesionAbiertaPor")
+  sesionesCerradas      SesionCaja[]           @relation("SesionCerradaPor")
+  movimientosCaja       MovimientoCaja[]
+}
+
+model Categoria {
+  id        String     @id @default(uuid())
+  nombre    String     @unique
+  creadoEn  DateTime   @default(now())
+  productos Producto[]
+}
+
+model Producto {
+  id            String     @id @default(uuid())
+  nombre        String
+  descripcion   String?
+  codigoBarras  String?    @unique
+  sku           String?    @unique
+  precio        Decimal    @db.Decimal(10, 2)
+  costo         Decimal    @db.Decimal(10, 2)
+  stock         Int        @default(0)
+  activo        Boolean    @default(true)
+  categoriaId   String
+  categoria     Categoria  @relation(fields: [categoriaId], references: [id])
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+
+  itemsVenta            ItemVenta[]
+  movimientosInventario MovimientoInventario[]
+}
+
+model Venta {
+  id           String      @id @default(uuid())
+  folio        String      @unique
+  subtotal     Decimal     @db.Decimal(10, 2)
+  impuesto     Decimal     @db.Decimal(10, 2)
+  total        Decimal     @db.Decimal(10, 2)
+  metodoPago   MetodoPago
+  estado       EstadoVenta @default(COMPLETADA)
+  usuarioId    String
+  usuario      Usuario     @relation(fields: [usuarioId], references: [id])
+  sesionCajaId String
+  sesionCaja   SesionCaja  @relation(fields: [sesionCajaId], references: [id])
+  creadoEn     DateTime    @default(now())
+
+  items ItemVenta[]
+}
+
+model ItemVenta {
+  id         String   @id @default(uuid())
+  cantidad   Int
+  precio     Decimal  @db.Decimal(10, 2)
+  subtotal   Decimal  @db.Decimal(10, 2)
+  ventaId    String
+  venta      Venta    @relation(fields: [ventaId], references: [id])
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+}
+
+model MovimientoInventario {
+  id            String                   @id @default(uuid())
+  tipo          TipoMovimientoInventario
+  cantidad      Int
+  stockAnterior Int
+  stockNuevo    Int
+  notas         String?
+  productoId    String
+  producto      Producto                 @relation(fields: [productoId], references: [id])
+  usuarioId     String
+  usuario       Usuario                  @relation(fields: [usuarioId], references: [id])
+  creadoEn      DateTime                 @default(now())
+}
+
+model Caja {
+  id       String       @id @default(uuid())
+  nombre   String
+  activa   Boolean      @default(true)
+  creadoEn DateTime     @default(now())
+  sesiones SesionCaja[]
+}
+
+model SesionCaja {
+  id             String           @id @default(uuid())
+  montoApertura  Decimal          @db.Decimal(10, 2)
+  montoCierre    Decimal?         @db.Decimal(10, 2)
+  montoEsperado  Decimal?         @db.Decimal(10, 2)
+  diferencia     Decimal?         @db.Decimal(10, 2)
+  estado         EstadoSesionCaja @default(ABIERTA)
+  abiertaEn      DateTime         @default(now())
+  cerradaEn      DateTime?
+  cajaId         String
+  caja           Caja             @relation(fields: [cajaId], references: [id])
+  abiertaPorId   String
+  abiertaPor     Usuario          @relation("SesionAbiertaPor", fields: [abiertaPorId], references: [id])
+  cerradaPorId   String?
+  cerradaPor     Usuario?         @relation("SesionCerradaPor", fields: [cerradaPorId], references: [id])
+
+  ventas      Venta[]
+  movimientos MovimientoCaja[]
+}
+
+model MovimientoCaja {
+  id           String             @id @default(uuid())
+  tipo         TipoMovimientoCaja
+  monto        Decimal            @db.Decimal(10, 2)
+  notas        String?
+  sesionCajaId String
+  sesionCaja   SesionCaja         @relation(fields: [sesionCajaId], references: [id])
+  usuarioId    String
+  usuario      Usuario            @relation(fields: [usuarioId], references: [id])
+  creadoEn     DateTime           @default(now())
+}
