@@ -20,15 +20,15 @@ export class ProductsController {
   @Roles(RolUsuario.ADMIN, RolUsuario.GERENTE)
   @ApiOperation({ summary: 'Crear producto' })
   @ApiResponse({ status: 201, description: 'Producto creado' })
-  @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
   @ApiResponse({ status: 409, description: 'Código de barras o SKU duplicado' })
+  @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
   create(@Body() dto: CreateProductoDto) {
     return this.productsService.create(dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar productos' })
-  @ApiQuery({ name: 'todos', required: false, description: 'Pasar "true" para incluir inactivos' })
+  @ApiQuery({ name: 'todos', required: false, type: String, description: 'Pasar "true" para incluir inactivos' })
   @ApiResponse({ status: 200, description: 'Lista de productos' })
   findAll(@Query('todos') todos?: string) {
     return this.productsService.findAll(todos !== 'true');
