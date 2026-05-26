@@ -9,6 +9,7 @@ const SELECT_USUARIO = {
   nombre: true,
   correo: true,
   rol: true,
+  activo: true,
   creadoEn: true,
   actualizadoEn: true,
 };
