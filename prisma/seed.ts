@@ -74,11 +74,10 @@ async function main() {
   console.log(`✓ Productos: ${productos.length} registros`);
 
   // ─── Caja ─────────────────────────────────────────────────────────────────────
-  const caja = await prisma.caja.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
-    update: {},
-    create: { id: '00000000-0000-0000-0000-000000000001', nombre: 'Caja Principal' },
-  });
+  let caja = await prisma.caja.findFirst({ where: { nombre: 'Caja Principal' } });
+  if (!caja) {
+    caja = await prisma.caja.create({ data: { nombre: 'Caja Principal' } });
+  }
 
   console.log('✓ Caja:', caja.nombre);
   console.log('\n─── Credenciales ────────────────────────────────');
