@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductoDto } from './dto/create-product.dto';
 import { UpdateProductoDto } from './dto/update-product.dto';
+import { UploadsService } from '../uploads/uploads.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   async create(dto: CreateProductoDto) {
     await this.validarCategoria(dto.categoriaId);
@@ -32,10 +36,15 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductoDto) {
-    await this.findOne(id);
+    const producto = await this.findOne(id);
 
     if (dto.categoriaId) await this.validarCategoria(dto.categoriaId);
     await this.validarCamposUnicos(dto.codigoBarras, dto.sku, id);
+
+    // Si se sube una nueva imagen, eliminar la anterior de Cloudinary
+    if (dto.imagenPublicId && producto.imagenPublicId && dto.imagenPublicId !== producto.imagenPublicId) {
+      await this.uploadsService.deleteImage(producto.imagenPublicId);
+    }
 
     return this.prisma.producto.update({
       where: { id },

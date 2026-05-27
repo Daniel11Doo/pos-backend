@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsPositive, IsInt, Min, MinLength, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsPositive, IsInt, Min, MinLength, IsUUID, IsUrl } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProductoDto {
@@ -41,4 +41,14 @@ export class CreateProductoDto {
   @ApiProperty({ example: 'uuid-de-la-categoria' })
   @IsUUID('4', { message: 'categoriaId debe ser un UUID válido' })
   categoriaId: string;
+
+  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/...' })
+  @IsOptional()
+  @IsUrl({}, { message: 'imagenUrl debe ser una URL válida' })
+  imagenUrl?: string;
+
+  @ApiPropertyOptional({ example: 'pos/products/abc123' })
+  @IsOptional()
+  @IsString()
+  imagenPublicId?: string;
 }
