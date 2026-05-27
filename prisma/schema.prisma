@@ -75,19 +75,21 @@ model Categoria {
 }
 
 model Producto {
-  id            String     @id @default(uuid())
-  nombre        String
-  descripcion   String?
-  codigoBarras  String?    @unique
-  sku           String?    @unique
-  precio        Decimal    @db.Decimal(10, 2)
-  costo         Decimal    @db.Decimal(10, 2)
-  stock         Int        @default(0)
-  activo        Boolean    @default(true)
-  categoriaId   String
-  categoria     Categoria  @relation(fields: [categoriaId], references: [id])
-  creadoEn      DateTime   @default(now())
-  actualizadoEn DateTime   @updatedAt
+  id             String     @id @default(uuid())
+  nombre         String
+  descripcion    String?
+  codigoBarras   String?    @unique
+  sku            String?    @unique
+  precio         Decimal    @db.Decimal(10, 2)
+  costo          Decimal    @db.Decimal(10, 2)
+  stock          Int        @default(0)
+  activo         Boolean    @default(true)
+  imagenUrl      String?
+  imagenPublicId String?
+  categoriaId    String
+  categoria      Categoria  @relation(fields: [categoriaId], references: [id])
+  creadoEn       DateTime   @default(now())
+  actualizadoEn  DateTime   @updatedAt
 
   itemsVenta            ItemVenta[]
   movimientosInventario MovimientoInventario[]
