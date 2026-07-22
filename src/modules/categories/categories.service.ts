@@ -49,7 +49,7 @@ export class CategoriesService {
   async remove(id: string) {
     const categoria = await this.findOne(id);
 
-    const tieneProductos = await this.prisma.producto.count({ where: { categoriaId: id } });
+    const tieneProductos = await this.prisma.producto.count({ where: { categoriaId: id, activo: true } });
     if (tieneProductos > 0) {
       throw new BadRequestException('No se puede eliminar una categoría con productos asociados');
     }
