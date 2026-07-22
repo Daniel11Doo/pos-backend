@@ -4,11 +4,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
-async function bootstrap() {
+async function createApp() {
   const app = await NestFactory.create(AppModule);
 
+  const corsOrigin = process.env.CORS_ORIGIN ?? '*';
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') ?? '*',
+    origin: corsOrigin === '*' ? '*' : corsOrigin.split(','),
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
@@ -40,6 +42,32 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  return app;
+}
+
+// En Vercel este archivo se importa como módulo (no se ejecuta directo), así
+// que necesita exportar un handler serverless en vez de solo escuchar un
+// puerto. Se cachea la instancia entre invocaciones "warm" de la función.
+let cachedHandler: ((req: unknown, res: unknown) => void) | undefined;
+
+export default async function handler(req: unknown, res: unknown) {
+  if (!cachedHandler) {
+    const app = await createApp();
+    await app.init();
+    cachedHandler = app.getHttpAdapter().getInstance();
+  }
+  const server = cachedHandler!;
+  server(req, res);
+}
+
+async function bootstrap() {
+  const app = await createApp();
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
-bootstrap();
+
+// Solo levanta un servidor tradicional cuando este archivo se ejecuta
+// directo (desarrollo local, `start:prod`) — no cuando Vercel lo importa
+// como función serverless.
+if (require.main === module) {
+  bootstrap();
+}

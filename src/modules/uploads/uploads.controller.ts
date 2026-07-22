@@ -7,6 +7,7 @@ import {
   MaxFileSizeValidator,
   FileTypeValidator,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -25,8 +26,10 @@ import { RolUsuario } from '@prisma/client';
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
+  private static readonly CARPETAS_PERMITIDAS = ['pos/products', 'pos/categories', 'pos/avatars'];
+
   @Post('image')
-  @ApiOperation({ summary: 'Subir imagen de producto' })
+  @ApiOperation({ summary: 'Subir imagen de producto o categoría' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -50,7 +53,9 @@ export class UploadsController {
       }),
     )
     file: Express.Multer.File,
+    @Query('folder') folder?: string,
   ) {
-    return this.uploadsService.uploadImage(file);
+    const carpeta = UploadsController.CARPETAS_PERMITIDAS.includes(folder ?? '') ? folder : undefined;
+    return this.uploadsService.uploadImage(file, carpeta);
   }
 }

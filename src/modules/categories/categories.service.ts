@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCategoriaDto } from './dto/create-category.dto';
 import { UpdateCategoriaDto } from './dto/update-category.dto';
+import { UploadsService } from '../uploads/uploads.service';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   async create(dto: CreateCategoriaDto) {
     const existe = await this.prisma.categoria.findUnique({ where: { nombre: dto.nombre } });
@@ -25,7 +29,7 @@ export class CategoriesService {
   }
 
   async update(id: string, dto: UpdateCategoriaDto) {
-    await this.findOne(id);
+    const categoria = await this.findOne(id);
 
     if (dto.nombre) {
       const existe = await this.prisma.categoria.findFirst({
@@ -34,15 +38,24 @@ export class CategoriesService {
       if (existe) throw new ConflictException('Ya existe una categoría con ese nombre');
     }
 
+    // Si se sube una nueva imagen, eliminar la anterior de Cloudinary
+    if (dto.imagenPublicId && categoria.imagenPublicId && dto.imagenPublicId !== categoria.imagenPublicId) {
+      await this.uploadsService.deleteImage(categoria.imagenPublicId);
+    }
+
     return this.prisma.categoria.update({ where: { id }, data: dto });
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const categoria = await this.findOne(id);
 
     const tieneProductos = await this.prisma.producto.count({ where: { categoriaId: id } });
     if (tieneProductos > 0) {
       throw new BadRequestException('No se puede eliminar una categoría con productos asociados');
+    }
+
+    if (categoria.imagenPublicId) {
+      await this.uploadsService.deleteImage(categoria.imagenPublicId);
     }
 
     return this.prisma.categoria.delete({ where: { id } });

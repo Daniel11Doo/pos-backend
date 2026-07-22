@@ -1,5 +1,21 @@
-import { IsString, IsOptional, IsNumber, IsPositive, IsInt, Min, MinLength, IsUUID, IsBoolean, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsPositive,
+  IsInt,
+  Min,
+  MinLength,
+  IsUUID,
+  IsBoolean,
+  IsUrl,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { RecetaInsumoDto } from './receta-insumo.dto';
+import { GrupoComplementoAplicableDto } from './grupo-complemento-aplicable.dto';
 
 export class UpdateProductoDto {
   @ApiPropertyOptional({ example: 'Coca-Cola 600ml' })
@@ -60,4 +76,32 @@ export class UpdateProductoDto {
   @IsOptional()
   @IsString()
   imagenPublicId?: string;
+
+  @ApiPropertyOptional({
+    type: [RecetaInsumoDto],
+    description: 'Receta opcional: reemplaza por completo los insumos asignados a este producto',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RecetaInsumoDto)
+  insumos?: RecetaInsumoDto[];
+
+  @ApiPropertyOptional({
+    example: 'uuid-del-grupo',
+    description: 'Si ESTE producto es un complemento (ej. un cold foam), a qué grupo pertenece',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'grupoComplementoId debe ser un UUID válido' })
+  grupoComplementoId?: string;
+
+  @ApiPropertyOptional({
+    type: [GrupoComplementoAplicableDto],
+    description: 'Reemplaza por completo los grupos de complementos aplicables a este producto',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GrupoComplementoAplicableDto)
+  gruposComplemento?: GrupoComplementoAplicableDto[];
 }

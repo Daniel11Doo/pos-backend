@@ -10,6 +10,8 @@ import { SalesModule } from './modules/sales/sales.module';
 import { CashRegistersModule } from './modules/cash-registers/cash-registers.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { InsumosModule } from './modules/insumos/insumos.module';
+import { ComplementGroupsModule } from './modules/complement-groups/complement-groups.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     CashRegistersModule,
     InventoryModule,
     UploadsModule,
+    InsumosModule,
+    ComplementGroupsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

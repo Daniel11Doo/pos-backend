@@ -123,4 +123,11 @@ export class CashRegistersService {
       orderBy: { creadoEn: 'desc' },
     });
   }
+
+  findAllMovimientos() {
+    return this.prisma.movimientoCaja.findMany({
+      include: { usuario: { select: { nombre: true } } },
+      orderBy: { creadoEn: 'desc' },
+    });
+  }
 }

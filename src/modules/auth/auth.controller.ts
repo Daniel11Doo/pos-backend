@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Get, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -27,5 +28,16 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   perfil(@CurrentUser() usuario: { id: string }) {
     return this.authService.perfil(usuario.id);
+  }
+
+  @Patch('perfil')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar mi perfil (nombre, correo, contraseña)' })
+  @ApiResponse({ status: 200, description: 'Perfil actualizado' })
+  @ApiResponse({ status: 400, description: 'Contraseña actual incorrecta' })
+  @ApiResponse({ status: 409, description: 'Correo ya en uso' })
+  actualizarPerfil(@CurrentUser() usuario: { id: string }, @Body() dto: UpdatePerfilDto) {
+    return this.authService.actualizarPerfil(usuario.id, dto);
   }
 }

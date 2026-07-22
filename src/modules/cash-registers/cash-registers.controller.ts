@@ -35,33 +35,11 @@ export class CashRegistersController {
     return this.cashRegistersService.findAllCajas();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Obtener caja por ID' })
-  @ApiResponse({ status: 200, description: 'Caja encontrada' })
-  @ApiResponse({ status: 404, description: 'Caja no encontrada' })
-  findOneCaja(@Param('id') id: string) {
-    return this.cashRegistersService.findOneCaja(id);
-  }
-
-  @Patch(':id')
-  @UseGuards(RolesGuard)
-  @Roles(RolUsuario.ADMIN)
-  @ApiOperation({ summary: 'Actualizar caja' })
-  @ApiResponse({ status: 200, description: 'Caja actualizada' })
-  updateCaja(@Param('id') id: string, @Body() dto: UpdateCajaDto) {
-    return this.cashRegistersService.updateCaja(id, dto);
-  }
-
-  @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles(RolUsuario.ADMIN)
-  @ApiOperation({ summary: 'Desactivar caja (soft delete)' })
-  @ApiResponse({ status: 200, description: 'Caja desactivada' })
-  removeCaja(@Param('id') id: string) {
-    return this.cashRegistersService.removeCaja(id);
-  }
-
   // ─── Sesiones ─────────────────────────────────────────────────────────────────
+  // Nota: estas rutas literales ('sessions', 'sessions/:id/...') deben declararse
+  // antes que 'Caja' -> @Get(':id')/@Patch(':id')/@Delete(':id'), porque Nest
+  // registra las rutas en orden de declaración y ':id' capturaría "sessions"
+  // como si fuera el id de una caja.
 
   @Post('sessions')
   @ApiOperation({ summary: 'Abrir sesión de caja' })
@@ -120,5 +98,44 @@ export class CashRegistersController {
   @ApiResponse({ status: 200, description: 'Lista de movimientos' })
   findMovimientos(@Param('id') id: string) {
     return this.cashRegistersService.findMovimientos(id);
+  }
+
+  // Nota: 'movements' (literal) debe declararse antes que 'Caja' -> @Get(':id'),
+  // por la misma razón explicada arriba para 'sessions'.
+  @Get('movements')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMIN, RolUsuario.GERENTE)
+  @ApiOperation({ summary: 'Listar todos los movimientos de caja (todas las sesiones)' })
+  @ApiResponse({ status: 200, description: 'Lista completa de movimientos, para reportes' })
+  findAllMovimientos() {
+    return this.cashRegistersService.findAllMovimientos();
+  }
+
+  // ─── Caja ────────────────────────────────────────────────────────────────────
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener caja por ID' })
+  @ApiResponse({ status: 200, description: 'Caja encontrada' })
+  @ApiResponse({ status: 404, description: 'Caja no encontrada' })
+  findOneCaja(@Param('id') id: string) {
+    return this.cashRegistersService.findOneCaja(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMIN)
+  @ApiOperation({ summary: 'Actualizar caja' })
+  @ApiResponse({ status: 200, description: 'Caja actualizada' })
+  updateCaja(@Param('id') id: string, @Body() dto: UpdateCajaDto) {
+    return this.cashRegistersService.updateCaja(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMIN)
+  @ApiOperation({ summary: 'Desactivar caja (soft delete)' })
+  @ApiResponse({ status: 200, description: 'Caja desactivada' })
+  removeCaja(@Param('id') id: string) {
+    return this.cashRegistersService.removeCaja(id);
   }
 }

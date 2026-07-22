@@ -11,17 +11,44 @@ export class ProductsService {
     private readonly uploadsService: UploadsService,
   ) {}
 
+  private static readonly INCLUDE = {
+    categoria: true,
+    insumos: { include: { insumo: true } },
+    grupoComplemento: true,
+    gruposComplementoAplicables: { include: { grupoComplemento: true } },
+  };
+
   async create(dto: CreateProductoDto) {
     await this.validarCategoria(dto.categoriaId);
     await this.validarCamposUnicos(dto.codigoBarras, dto.sku);
 
-    return this.prisma.producto.create({ data: dto, include: { categoria: true } });
+    const { insumos, gruposComplemento, ...data } = dto;
+    if (insumos?.length) await this.validarInsumos(insumos.map((i) => i.insumoId));
+    if (gruposComplemento?.length) await this.validarGruposComplemento(gruposComplemento.map((g) => g.grupoComplementoId));
+
+    return this.prisma.producto.create({
+      data: {
+        ...data,
+        ...(insumos?.length && {
+          insumos: { create: insumos.map((i) => ({ cantidad: i.cantidad, insumoId: i.insumoId })) },
+        }),
+        ...(gruposComplemento?.length && {
+          gruposComplementoAplicables: {
+            create: gruposComplemento.map((g) => ({
+              grupoComplementoId: g.grupoComplementoId,
+              incluidosGratis: g.incluidosGratis ?? 0,
+            })),
+          },
+        }),
+      },
+      include: ProductsService.INCLUDE,
+    });
   }
 
   findAll(soloActivos = true) {
     return this.prisma.producto.findMany({
       where: soloActivos ? { activo: true } : undefined,
-      include: { categoria: true },
+      include: ProductsService.INCLUDE,
       orderBy: { nombre: 'asc' },
     });
   }
@@ -29,7 +56,7 @@ export class ProductsService {
   async findOne(id: string) {
     const producto = await this.prisma.producto.findUnique({
       where: { id },
-      include: { categoria: true },
+      include: ProductsService.INCLUDE,
     });
     if (!producto) throw new NotFoundException('Producto no encontrado');
     return producto;
@@ -46,10 +73,34 @@ export class ProductsService {
       await this.uploadsService.deleteImage(producto.imagenPublicId);
     }
 
-    return this.prisma.producto.update({
-      where: { id },
-      data: dto,
-      include: { categoria: true },
+    const { insumos, gruposComplemento, ...data } = dto;
+    if (insumos) await this.validarInsumos(insumos.map((i) => i.insumoId));
+    if (gruposComplemento) await this.validarGruposComplemento(gruposComplemento.map((g) => g.grupoComplementoId));
+
+    return this.prisma.$transaction(async (tx) => {
+      if (insumos) {
+        await tx.productoInsumo.deleteMany({ where: { productoId: id } });
+        if (insumos.length) {
+          await tx.productoInsumo.createMany({
+            data: insumos.map((i) => ({ productoId: id, insumoId: i.insumoId, cantidad: i.cantidad })),
+          });
+        }
+      }
+
+      if (gruposComplemento) {
+        await tx.productoGrupoComplemento.deleteMany({ where: { productoId: id } });
+        if (gruposComplemento.length) {
+          await tx.productoGrupoComplemento.createMany({
+            data: gruposComplemento.map((g) => ({
+              productoId: id,
+              grupoComplementoId: g.grupoComplementoId,
+              incluidosGratis: g.incluidosGratis ?? 0,
+            })),
+          });
+        }
+      }
+
+      return tx.producto.update({ where: { id }, data, include: ProductsService.INCLUDE });
     });
   }
 
@@ -65,6 +116,30 @@ export class ProductsService {
   private async validarCategoria(categoriaId: string) {
     const categoria = await this.prisma.categoria.findUnique({ where: { id: categoriaId } });
     if (!categoria) throw new NotFoundException('Categoría no encontrada');
+  }
+
+  private async validarInsumos(insumoIds: string[]) {
+    const unicos = [...new Set(insumoIds)];
+    if (unicos.length !== insumoIds.length) {
+      throw new ConflictException('No repitas el mismo insumo en la receta');
+    }
+
+    const encontrados = await this.prisma.insumo.findMany({ where: { id: { in: unicos } } });
+    if (encontrados.length !== unicos.length) {
+      throw new NotFoundException('Uno o más insumos de la receta no existen');
+    }
+  }
+
+  private async validarGruposComplemento(grupoIds: string[]) {
+    const unicos = [...new Set(grupoIds)];
+    if (unicos.length !== grupoIds.length) {
+      throw new ConflictException('No repitas el mismo grupo de complementos');
+    }
+
+    const encontrados = await this.prisma.grupoComplemento.findMany({ where: { id: { in: unicos } } });
+    if (encontrados.length !== unicos.length) {
+      throw new NotFoundException('Uno o más grupos de complementos no existen');
+    }
   }
 
   private async validarCamposUnicos(codigoBarras?: string, sku?: string, excludeId?: string) {

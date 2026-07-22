@@ -27,6 +27,8 @@ export class InventoryController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMIN, RolUsuario.GERENTE)
   @ApiOperation({ summary: 'Listar movimientos de inventario' })
   @ApiQuery({ name: 'productoId', required: false, description: 'Filtrar por producto' })
   @ApiResponse({ status: 200, description: 'Lista de movimientos' })
@@ -35,6 +37,8 @@ export class InventoryController {
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMIN, RolUsuario.GERENTE)
   @ApiOperation({ summary: 'Obtener movimiento por ID' })
   @ApiResponse({ status: 200, description: 'Movimiento encontrado' })
   @ApiResponse({ status: 404, description: 'Movimiento no encontrado' })

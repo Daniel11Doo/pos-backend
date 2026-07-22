@@ -6,10 +6,12 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
   imports: [
     PassportModule,
+    UploadsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any },
