@@ -49,15 +49,40 @@ export class CategoriesService {
   async remove(id: string) {
     const categoria = await this.findOne(id);
 
-    const tieneProductos = await this.prisma.producto.count({ where: { categoriaId: id, activo: true } });
-    if (tieneProductos > 0) {
-      throw new BadRequestException('No se puede eliminar una categoría con productos asociados');
+    // Los productos se desactivan (soft delete) en vez de borrarse, asi que
+    // una categoria "vacia" en el catalogo puede seguir teniendo productos
+    // inactivos que la referencian. Bloqueamos solo si hay productos activos;
+    // los inactivos se borran de verdad junto con la categoria mas abajo.
+    const productos = await this.prisma.producto.findMany({ where: { categoriaId: id } });
+    if (productos.some((p) => p.activo)) {
+      throw new BadRequestException('No se puede eliminar una categoría con productos activos');
+    }
+
+    if (productos.length > 0) {
+      const productoIds = productos.map((p) => p.id);
+      const [ventas, movimientos] = await Promise.all([
+        this.prisma.itemVenta.count({ where: { productoId: { in: productoIds } } }),
+        this.prisma.movimientoInventario.count({ where: { productoId: { in: productoIds } } }),
+      ]);
+      if (ventas > 0 || movimientos > 0) {
+        throw new BadRequestException(
+          'No se puede eliminar: productos desactivados de esta categoría tienen historial de ventas o inventario',
+        );
+      }
+
+      for (const producto of productos) {
+        if (producto.imagenPublicId) await this.uploadsService.deleteImage(producto.imagenPublicId);
+      }
     }
 
     if (categoria.imagenPublicId) {
       await this.uploadsService.deleteImage(categoria.imagenPublicId);
     }
 
-    return this.prisma.categoria.delete({ where: { id } });
+    const [, categoriaEliminada] = await this.prisma.$transaction([
+      this.prisma.producto.deleteMany({ where: { categoriaId: id } }),
+      this.prisma.categoria.delete({ where: { id } }),
+    ]);
+    return categoriaEliminada;
   }
 }
