@@ -88,10 +88,15 @@ npx prisma studio           # UI de la base de datos
   producto se procesen casi al mismo tiempo. Si se toca esta lógica, mantener
   el patrón `updateMany` + chequeo de `count`, no volver a un
   `findUnique` + `update` con el valor leído antes de la transacción.
-- No hay `ExceptionFilter` global: un error de Prisma conocido (P2002 unique,
-  P2025 not found, P2003 FK) llega al cliente como 500 genérico en vez de un
-  4xx legible. Si agregas un filtro global, hazlo para todo `src/`, no parche
-  por controller.
+- `PrismaExceptionFilter` (`src/common/filters/prisma-exception.filter.ts`,
+  registrado global en `main.ts`) traduce P2002/P2025/P2003 a 409/404/409 con
+  mensaje legible. Cualquier otro código de Prisma sigue cayendo como 500 —
+  si agregas soporte para otro código, súmalo a `STATUS_BY_CODE`/`MESSAGE_BY_CODE`
+  ahí, no captures Prisma errors por controller.
+- `/auth/login` tiene `@UseGuards(ThrottlerGuard)` (5 intentos/60s, configurado
+  en `AuthModule` vía `ThrottlerModule.forRoot`) — no es un guard global, solo
+  protege login. Si se necesita en otro endpoint sensible, agregar el guard
+  ahí explícitamente en vez de aplicarlo a toda la API.
 - `src/main.ts` valida al arrancar (`validateEnv`) que `JWT_SECRET` y
   `DATABASE_URL` existan — si falta alguna, el proceso truena de inmediato
   con un mensaje claro en vez de fallar silenciosamente en el primer login.

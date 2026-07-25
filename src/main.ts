@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
 // Si falta alguna de estas, el proceso arranca "bien" pero el primer login o
 // la primera query truenan en runtime con un error críptico. Mejor fallar
@@ -35,6 +36,8 @@ async function createApp() {
       transform: true,
     }),
   );
+
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   app.setGlobalPrefix('api');
 
