@@ -3,8 +3,6 @@ import { TipoMovimientoInventario, TipoMovimientoCaja } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateVentaDto } from './dto/create-sale.dto';
 
-const TAX_RATE = 0.16;
-
 const INCLUDE_VENTA = {
   items: { include: { producto: { select: { nombre: true, imagenUrl: true } } } },
   usuario: { select: { nombre: true } },
@@ -33,8 +31,8 @@ export class SalesService {
     );
 
     const subtotal = productos.reduce((acc, { cantidad, producto }) => acc + Number(producto.precio) * cantidad, 0);
-    const impuesto = Math.round(subtotal * TAX_RATE * 100) / 100;
-    const total = Math.round((subtotal + impuesto) * 100) / 100;
+    const impuesto = 0;
+    const total = subtotal;
     const folio = this.generarFolio();
 
     const consumoInsumos = await this.agregarConsumoInsumos(productos);
