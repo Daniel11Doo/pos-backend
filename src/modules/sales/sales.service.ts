@@ -65,14 +65,20 @@ export class SalesService {
       });
 
       for (const { cantidad, producto } of productos) {
-        const stockNuevo = producto.stock - cantidad;
-        await tx.producto.update({ where: { id: producto.id }, data: { stock: stockNuevo } });
+        const descontado = await tx.producto.updateMany({
+          where: { id: producto.id, stock: { gte: cantidad } },
+          data: { stock: { decrement: cantidad } },
+        });
+        if (descontado.count === 0) {
+          throw new BadRequestException(`Stock insuficiente para "${producto.nombre}"`);
+        }
+        const actualizado = await tx.producto.findUniqueOrThrow({ where: { id: producto.id } });
         await tx.movimientoInventario.create({
           data: {
             tipo: TipoMovimientoInventario.VENTA,
             cantidad,
-            stockAnterior: producto.stock,
-            stockNuevo,
+            stockAnterior: actualizado.stock + cantidad,
+            stockNuevo: actualizado.stock,
             notas: `Venta folio ${folio}`,
             productoId: producto.id,
             usuarioId,
@@ -81,15 +87,20 @@ export class SalesService {
       }
 
       for (const { insumoId, insumo, cantidad } of consumoInsumos) {
-        const stockAnterior = Number(insumo.stock);
-        const stockNuevo = stockAnterior - cantidad;
-        await tx.insumo.update({ where: { id: insumoId }, data: { stock: stockNuevo } });
+        const descontado = await tx.insumo.updateMany({
+          where: { id: insumoId, stock: { gte: cantidad } },
+          data: { stock: { decrement: cantidad } },
+        });
+        if (descontado.count === 0) {
+          throw new BadRequestException(`Stock insuficiente de "${insumo.nombre}"`);
+        }
+        const actualizado = await tx.insumo.findUniqueOrThrow({ where: { id: insumoId } });
         await tx.movimientoInsumo.create({
           data: {
             tipo: TipoMovimientoInventario.VENTA,
             cantidad,
-            stockAnterior,
-            stockNuevo,
+            stockAnterior: Number(actualizado.stock) + cantidad,
+            stockNuevo: Number(actualizado.stock),
             notas: `Venta folio ${folio}`,
             insumoId,
             usuarioId,
