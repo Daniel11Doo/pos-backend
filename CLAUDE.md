@@ -73,3 +73,27 @@ npx prisma studio           # UI de la base de datos
   validaciones a mano dentro del service si el DTO ya las cubre.
 - Antes de tocar `schema.prisma`, revisa las migraciones existentes en
   `prisma/migrations/` para mantener el estilo de nombres y de constraints.
+
+## Arquitectura de deploy (Vercel serverless + Railway)
+
+- `PrismaService` es singleton vía `@Global()` (`prisma.module.ts`), y
+  `main.ts` cachea la instancia de Nest entre invocaciones warm de la función
+  serverless de Vercel — no crear un `PrismaClient` nuevo por request, se
+  agotaría el pool de conexiones de Neon/Postgres.
+- `sales.service.ts` envuelve venta + descuento de insumos/inventario +
+  movimiento de caja en un solo `$transaction` (atómico). El descuento de
+  stock de producto e insumo usa `updateMany` con `where: { stock: { gte } }`
+  + `decrement` (update condicional atómico a nivel SQL) en vez de leer y
+  restar en JS — así no se puede sobrevender aunque dos ventas del mismo
+  producto se procesen casi al mismo tiempo. Si se toca esta lógica, mantener
+  el patrón `updateMany` + chequeo de `count`, no volver a un
+  `findUnique` + `update` con el valor leído antes de la transacción.
+- No hay `ExceptionFilter` global: un error de Prisma conocido (P2002 unique,
+  P2025 not found, P2003 FK) llega al cliente como 500 genérico en vez de un
+  4xx legible. Si agregas un filtro global, hazlo para todo `src/`, no parche
+  por controller.
+- `src/main.ts` valida al arrancar (`validateEnv`) que `JWT_SECRET` y
+  `DATABASE_URL` existan — si falta alguna, el proceso truena de inmediato
+  con un mensaje claro en vez de fallar silenciosamente en el primer login.
+  Si agregas otra env var que sea indispensable para que el servicio
+  funcione (no un feature opcional), súmala a `REQUIRED_ENV_VARS`.

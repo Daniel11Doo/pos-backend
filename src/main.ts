@@ -4,7 +4,20 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+// Si falta alguna de estas, el proceso arranca "bien" pero el primer login o
+// la primera query truenan en runtime con un error críptico. Mejor fallar
+// aquí, con un mensaje claro, que descubrirlo cuando un cajero no puede entrar.
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DATABASE_URL'];
+
+function validateEnv() {
+  const faltantes = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
+  if (faltantes.length > 0) {
+    throw new Error(`Faltan variables de entorno requeridas: ${faltantes.join(', ')}`);
+  }
+}
+
 async function createApp() {
+  validateEnv();
   const app = await NestFactory.create(AppModule);
 
   const corsOrigin = process.env.CORS_ORIGIN ?? '*';
