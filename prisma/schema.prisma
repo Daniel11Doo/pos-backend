@@ -185,7 +185,8 @@ model Venta {
   sesionCaja   SesionCaja  @relation(fields: [sesionCajaId], references: [id])
   creadoEn     DateTime    @default(now())
 
-  items ItemVenta[]
+  items          ItemVenta[]
+  movimientoCaja MovimientoCaja?
 }
 
 model ItemVenta {
@@ -251,4 +252,7 @@ model MovimientoCaja {
   usuarioId    String
   usuario      Usuario            @relation(fields: [usuarioId], references: [id])
   creadoEn     DateTime           @default(now())
+
+  ventaId String? @unique
+  venta   Venta?  @relation(fields: [ventaId], references: [id])
 }
