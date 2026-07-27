@@ -11,6 +11,11 @@ export class InventoryService {
     const producto = await this.prisma.producto.findUnique({ where: { id: dto.productoId } });
     if (!producto) throw new NotFoundException('Producto no encontrado');
     if (!producto.activo) throw new BadRequestException('El producto está inactivo');
+    if (producto.stock === null) {
+      throw new BadRequestException(
+        `"${producto.nombre}" no lleva control de stock propio — asígnale un stock desde el catálogo primero`,
+      );
+    }
 
     const stockAnterior = producto.stock;
     const stockNuevo = this.calcularStockNuevo(dto.tipo, stockAnterior, dto.cantidad);

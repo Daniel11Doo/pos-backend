@@ -88,7 +88,7 @@ model Producto {
   sku            String?    @unique
   precio         Decimal    @db.Decimal(10, 2)
   costo          Decimal    @db.Decimal(10, 2)
-  stock          Int        @default(0)
+  stock          Int?
   activo         Boolean    @default(true)
   imagenUrl      String?
   imagenPublicId String?

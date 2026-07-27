@@ -25,7 +25,7 @@ export class SalesService {
         const producto = await this.prisma.producto.findUnique({ where: { id: item.productoId } });
         if (!producto) throw new NotFoundException(`Producto ${item.productoId} no encontrado`);
         if (!producto.activo) throw new BadRequestException(`El producto "${producto.nombre}" está inactivo`);
-        if (producto.stock < item.cantidad) {
+        if (producto.stock !== null && producto.stock < item.cantidad) {
           throw new BadRequestException(`Stock insuficiente para "${producto.nombre}". Disponible: ${producto.stock}`);
         }
         return { ...item, producto };
@@ -67,6 +67,7 @@ export class SalesService {
       });
 
       for (const { cantidad, producto } of productos) {
+        if (producto.stock === null) continue; // este producto no lleva control de stock
         const descontado = await tx.producto.updateMany({
           where: { id: producto.id, stock: { gte: cantidad } },
           data: { stock: { decrement: cantidad } },
@@ -79,8 +80,8 @@ export class SalesService {
           data: {
             tipo: TipoMovimientoInventario.VENTA,
             cantidad,
-            stockAnterior: actualizado.stock + cantidad,
-            stockNuevo: actualizado.stock,
+            stockAnterior: actualizado.stock! + cantidad,
+            stockNuevo: actualizado.stock!,
             notas: `Venta folio ${folio}`,
             productoId: producto.id,
             usuarioId,
@@ -163,6 +164,7 @@ export class SalesService {
 
       for (const item of venta.items) {
         const producto = await tx.producto.findUnique({ where: { id: item.productoId } });
+        if (producto!.stock === null) continue; // este producto no lleva control de stock
         const stockNuevo = producto!.stock + item.cantidad;
         await tx.producto.update({ where: { id: item.productoId }, data: { stock: stockNuevo } });
         await tx.movimientoInventario.create({
@@ -251,7 +253,7 @@ export class SalesService {
         if (delta > 0 && !producto.activo) {
           throw new BadRequestException(`El producto "${producto.nombre}" está inactivo`);
         }
-        if (delta > 0 && producto.stock < delta) {
+        if (delta > 0 && producto.stock !== null && producto.stock < delta) {
           throw new BadRequestException(`Stock insuficiente para "${producto.nombre}". Disponible: ${producto.stock}`);
         }
         return { producto, delta };
@@ -294,6 +296,7 @@ export class SalesService {
 
     return this.prisma.$transaction(async (tx) => {
       for (const { producto, delta } of deltasProducto) {
+        if (producto.stock === null) continue; // este producto no lleva control de stock
         const stockAnterior = (await tx.producto.findUniqueOrThrow({ where: { id: producto.id } })).stock;
         if (delta > 0) {
           const descontado = await tx.producto.updateMany({
@@ -309,8 +312,8 @@ export class SalesService {
           data: {
             tipo: TipoMovimientoInventario.AJUSTE,
             cantidad: Math.abs(delta),
-            stockAnterior,
-            stockNuevo: actualizado.stock,
+            stockAnterior: stockAnterior!,
+            stockNuevo: actualizado.stock!,
             notas: `Edición venta folio ${venta.folio}`,
             productoId: producto.id,
             usuarioId,
@@ -389,6 +392,7 @@ export class SalesService {
     return this.prisma.$transaction(async (tx) => {
       for (const item of venta.items) {
         const producto = await tx.producto.findUnique({ where: { id: item.productoId } });
+        if (producto!.stock === null) continue; // este producto no lleva control de stock
         const stockNuevo = producto!.stock + item.cantidad;
         await tx.producto.update({ where: { id: item.productoId }, data: { stock: stockNuevo } });
         await tx.movimientoInventario.create({
