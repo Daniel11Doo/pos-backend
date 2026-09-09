@@ -12,6 +12,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { InsumosModule } from './modules/insumos/insumos.module';
 import { ComplementGroupsModule } from './modules/complement-groups/complement-groups.module';
+import { FidelidadModule } from './modules/fidelidad/fidelidad.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ComplementGroupsModule } from './modules/complement-groups/complement-g
     UploadsModule,
     InsumosModule,
     ComplementGroupsModule,
+    FidelidadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

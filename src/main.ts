@@ -53,6 +53,7 @@ async function createApp() {
     .addTag('Inventory', 'Movimientos de inventario (entradas, salidas y ajustes)')
     .addTag('Cash Registers', 'Cajas, sesiones y movimientos de efectivo')
     .addTag('Sales', 'Registro de ventas, cancelaciones y reembolsos')
+    .addTag('Fidelidad', 'Programa de fidelidad: registro de clientes, sellos y recompensas')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

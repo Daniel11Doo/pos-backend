@@ -69,6 +69,7 @@ model Usuario {
   sesionesAbiertas      SesionCaja[]           @relation("SesionAbiertaPor")
   sesionesCerradas      SesionCaja[]           @relation("SesionCerradaPor")
   movimientosCaja       MovimientoCaja[]
+  visitasFidelidad      VisitaFidelidad[]
 }
 
 model Categoria {
@@ -255,4 +256,39 @@ model MovimientoCaja {
 
   ventaId String? @unique
   venta   Venta?  @relation(fields: [ventaId], references: [id])
+}
+
+// ─── Fidelidad ─────────────────────────────────────────────────────────────────
+
+model Cliente {
+  id                 String   @id @default(uuid())
+  nombre             String
+  telefono           String   @unique
+  sellos             Int      @default(0)
+  premiosDisponibles Int      @default(0)
+  creadoEn           DateTime @default(now())
+
+  visitas VisitaFidelidad[]
+}
+
+model VisitaFidelidad {
+  id        String   @id @default(uuid())
+  // Solo la fecha (sin hora): junto con el @@unique de abajo es lo que
+  // impide que un mismo cliente reciba más de un sello el mismo día.
+  fecha     DateTime @db.Date
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+
+  registradoPorId String
+  registradoPor   Usuario @relation(fields: [registradoPorId], references: [id])
+
+  @@unique([clienteId, fecha])
+}
+
+// Fila única (id fijo "default") con la configuración del programa de
+// fidelidad, editable por ADMIN desde el panel.
+model ConfiguracionFidelidad {
+  id                    String @id @default("default")
+  sellosParaRecompensa  Int    @default(8)
+  descripcionRecompensa String @default("Postre gratis")
 }
