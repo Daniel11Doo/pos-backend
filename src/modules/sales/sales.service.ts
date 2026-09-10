@@ -22,7 +22,10 @@ export class SalesService {
 
     const productos = await Promise.all(
       dto.items.map(async (item) => {
-        const producto = await this.prisma.producto.findUnique({ where: { id: item.productoId } });
+        const producto = await this.prisma.producto.findUnique({
+          where: { id: item.productoId },
+          include: { gruposComplementoAplicables: true },
+        });
         if (!producto) throw new NotFoundException(`Producto ${item.productoId} no encontrado`);
         if (!producto.activo) throw new BadRequestException(`El producto "${producto.nombre}" está inactivo`);
         if (producto.stock !== null && producto.stock < item.cantidad) {
@@ -32,7 +35,13 @@ export class SalesService {
       }),
     );
 
-    const subtotal = productos.reduce((acc, { cantidad, producto }) => acc + Number(producto.precio) * cantidad, 0);
+    const productoPorId = new Map(productos.map(({ producto }) => [producto.id, producto]));
+    const cantidadGratisPorProducto = this.calcularCantidadesGratis(dto.items, productoPorId);
+
+    const subtotal = productos.reduce((acc, { cantidad, producto }) => {
+      const gratis = cantidadGratisPorProducto.get(producto.id) ?? 0;
+      return acc + Number(producto.precio) * (cantidad - gratis);
+    }, 0);
     const impuesto = 0;
     const total = subtotal;
     const folio = this.generarFolio();
@@ -55,12 +64,16 @@ export class SalesService {
           usuarioId,
           sesionCajaId: dto.sesionCajaId,
           items: {
-            create: productos.map(({ cantidad, producto }) => ({
-              cantidad,
-              precio: producto.precio,
-              subtotal: Number(producto.precio) * cantidad,
-              productoId: producto.id,
-            })),
+            create: productos.map(({ cantidad, producto }) => {
+              const cantidadGratis = cantidadGratisPorProducto.get(producto.id) ?? 0;
+              return {
+                cantidad,
+                precio: producto.precio,
+                cantidadGratis,
+                subtotal: Number(producto.precio) * (cantidad - cantidadGratis),
+                productoId: producto.id,
+              };
+            }),
           },
         },
         include: INCLUDE_VENTA,
@@ -228,8 +241,12 @@ export class SalesService {
     }
 
     const productoIds = [...new Set([...cantidadAnteriorPorProducto.keys(), ...cantidadNuevaPorProducto.keys()])];
-    const productos = await this.prisma.producto.findMany({ where: { id: { in: productoIds } } });
+    const productos = await this.prisma.producto.findMany({
+      where: { id: { in: productoIds } },
+      include: { gruposComplementoAplicables: true },
+    });
     const productoPorId = new Map(productos.map((p) => [p.id, p]));
+    const cantidadGratisPorProducto = this.calcularCantidadesGratis(dto.items, productoPorId);
 
     // Si la cantidad de un producto no cambió, se respeta el precio con el que
     // ya se vendió — de lo contrario, editar el ticket para agregar/quitar OTRO
@@ -288,10 +305,10 @@ export class SalesService {
       }
     }
 
-    const subtotal = dto.items.reduce(
-      (acc, item) => acc + Number(precioEfectivo(item.productoId, item.cantidad)) * item.cantidad,
-      0,
-    );
+    const subtotal = dto.items.reduce((acc, item) => {
+      const gratis = cantidadGratisPorProducto.get(item.productoId) ?? 0;
+      return acc + Number(precioEfectivo(item.productoId, item.cantidad)) * (item.cantidad - gratis);
+    }, 0);
     const total = subtotal;
 
     return this.prisma.$transaction(async (tx) => {
@@ -357,10 +374,12 @@ export class SalesService {
             deleteMany: {},
             create: dto.items.map((item) => {
               const precio = precioEfectivo(item.productoId, item.cantidad);
+              const cantidadGratis = cantidadGratisPorProducto.get(item.productoId) ?? 0;
               return {
                 cantidad: item.cantidad,
                 precio,
-                subtotal: Number(precio) * item.cantidad,
+                cantidadGratis,
+                subtotal: Number(precio) * (item.cantidad - cantidadGratis),
                 productoId: item.productoId,
               };
             }),
@@ -441,6 +460,48 @@ export class SalesService {
         include: INCLUDE_VENTA,
       });
     });
+  }
+
+  // Cuántas unidades de un producto-complemento (ej. un topping) vienen
+  // incluidas sin costo, según los productos "padre" presentes en ESTA MISMA
+  // venta (ej. Fresas con Crema incluye 1 topping gratis). El cálculo es del
+  // servidor, no confía en nada que mande el cliente, para que no se pueda
+  // reclamar más gratis de los que el catálogo realmente permite.
+  private calcularCantidadesGratis(
+    items: { productoId: string; cantidad: number }[],
+    productoPorId: Map<
+      string,
+      { grupoComplementoId: string | null; gruposComplementoAplicables: { grupoComplementoId: string; incluidosGratis: number }[] }
+    >,
+  ): Map<string, number> {
+    const disponiblePorGrupo = new Map<string, number>();
+    for (const item of items) {
+      const producto = productoPorId.get(item.productoId);
+      if (!producto) continue;
+      for (const aplicable of producto.gruposComplementoAplicables) {
+        if (aplicable.incluidosGratis <= 0) continue;
+        const actual = disponiblePorGrupo.get(aplicable.grupoComplementoId) ?? 0;
+        disponiblePorGrupo.set(aplicable.grupoComplementoId, actual + aplicable.incluidosGratis * item.cantidad);
+      }
+    }
+
+    const cantidadGratisPorProducto = new Map<string, number>();
+    // Orden estable por productoId para que la asignación sea determinística
+    // si hay más de un tipo de topping compitiendo por el mismo gratis.
+    const complementos = items
+      .filter((item) => productoPorId.get(item.productoId)?.grupoComplementoId)
+      .sort((a, b) => a.productoId.localeCompare(b.productoId));
+
+    for (const item of complementos) {
+      const grupoId = productoPorId.get(item.productoId)!.grupoComplementoId!;
+      const disponible = disponiblePorGrupo.get(grupoId) ?? 0;
+      if (disponible <= 0) continue;
+      const gratis = Math.min(disponible, item.cantidad);
+      cantidadGratisPorProducto.set(item.productoId, gratis);
+      disponiblePorGrupo.set(grupoId, disponible - gratis);
+    }
+
+    return cantidadGratisPorProducto;
   }
 
   private async agregarConsumoInsumos(productos: { cantidad: number; producto: { id: string } }[]) {

@@ -194,6 +194,9 @@ model ItemVenta {
   id         String   @id @default(uuid())
   cantidad   Int
   precio     Decimal  @db.Decimal(10, 2)
+  // Cuántas de `cantidad` no se cobraron (ej. el topping incluido gratis de
+  // Fresas con Crema) — `subtotal` ya sale de precio * (cantidad - cantidadGratis).
+  cantidadGratis Int  @default(0)
   subtotal   Decimal  @db.Decimal(10, 2)
   ventaId    String
   venta      Venta    @relation(fields: [ventaId], references: [id])
