@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@ne
 import { ProductsService } from './products.service';
 import { CreateProductoDto } from './dto/create-product.dto';
 import { UpdateProductoDto } from './dto/update-product.dto';
+import { SaveProductoTamanosDto } from './dto/save-producto-tamanos.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -24,6 +25,16 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
   create(@Body() dto: CreateProductoDto) {
     return this.productsService.create(dto);
+  }
+
+  @Post('tamanos')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMIN, RolUsuario.GERENTE)
+  @ApiOperation({ summary: 'Crear/actualizar en una sola acción un producto con varios tamaños (Chico/Mediano/Grande)' })
+  @ApiResponse({ status: 201, description: 'Productos de cada tamaño creados/actualizados' })
+  @ApiResponse({ status: 404, description: 'Categoría no encontrada' })
+  saveConTamanos(@Body() dto: SaveProductoTamanosDto) {
+    return this.productsService.saveConTamanos(dto);
   }
 
   @Get()

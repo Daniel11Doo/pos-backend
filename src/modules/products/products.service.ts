@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductoDto } from './dto/create-product.dto';
 import { UpdateProductoDto } from './dto/update-product.dto';
+import { SaveProductoTamanosDto } from './dto/save-producto-tamanos.dto';
 import { UploadsService } from '../uploads/uploads.service';
 
 @Injectable()
@@ -101,6 +103,77 @@ export class ProductsService {
       }
 
       return tx.producto.update({ where: { id }, data, include: ProductsService.INCLUDE });
+    });
+  }
+
+  async saveConTamanos(dto: SaveProductoTamanosDto) {
+    await this.validarCategoria(dto.categoriaId);
+
+    const tamanosUnicos = new Set(dto.tamanos.map((t) => t.size));
+    if (tamanosUnicos.size !== dto.tamanos.length) {
+      throw new ConflictException('No repitas el mismo tamaño');
+    }
+
+    const { insumos, gruposComplemento, tamanos, desactivarIds, nombre, ...datosComunes } = dto;
+    if (insumos?.length) await this.validarInsumos(insumos.map((i) => i.insumoId));
+    if (gruposComplemento?.length) await this.validarGruposComplemento(gruposComplemento.map((g) => g.grupoComplementoId));
+
+    return this.prisma.$transaction(async (tx) => {
+      const productos: Prisma.ProductoGetPayload<{ include: typeof ProductsService.INCLUDE }>[] = [];
+
+      for (const tamano of tamanos) {
+        const data = { ...datosComunes, nombre: `${nombre} (${tamano.size})`, precio: tamano.precio };
+
+        if (tamano.productoId) {
+          if (insumos) {
+            await tx.productoInsumo.deleteMany({ where: { productoId: tamano.productoId } });
+            if (insumos.length) {
+              await tx.productoInsumo.createMany({
+                data: insumos.map((i) => ({ productoId: tamano.productoId as string, insumoId: i.insumoId, cantidad: i.cantidad })),
+              });
+            }
+          }
+          if (gruposComplemento) {
+            await tx.productoGrupoComplemento.deleteMany({ where: { productoId: tamano.productoId } });
+            if (gruposComplemento.length) {
+              await tx.productoGrupoComplemento.createMany({
+                data: gruposComplemento.map((g) => ({
+                  productoId: tamano.productoId as string,
+                  grupoComplementoId: g.grupoComplementoId,
+                  incluidosGratis: g.incluidosGratis ?? 0,
+                })),
+              });
+            }
+          }
+          productos.push(await tx.producto.update({ where: { id: tamano.productoId }, data, include: ProductsService.INCLUDE }));
+        } else {
+          productos.push(
+            await tx.producto.create({
+              data: {
+                ...data,
+                ...(insumos?.length && {
+                  insumos: { create: insumos.map((i) => ({ cantidad: i.cantidad, insumoId: i.insumoId })) },
+                }),
+                ...(gruposComplemento?.length && {
+                  gruposComplementoAplicables: {
+                    create: gruposComplemento.map((g) => ({
+                      grupoComplementoId: g.grupoComplementoId,
+                      incluidosGratis: g.incluidosGratis ?? 0,
+                    })),
+                  },
+                }),
+              },
+              include: ProductsService.INCLUDE,
+            }),
+          );
+        }
+      }
+
+      if (desactivarIds?.length) {
+        await tx.producto.updateMany({ where: { id: { in: desactivarIds } }, data: { activo: false } });
+      }
+
+      return productos;
     });
   }
 
